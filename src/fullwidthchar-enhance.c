@@ -36,6 +36,8 @@
 #include "fcitx/instance.h"
 #include <fcitx/context.h>
 
+#include "cfgrw.h"
+
 char *sCornerTrans[] = {
     "　", "！", "＂", "＃", "￥", "％", "＆", "＇", "（", "）",
     "＊",
@@ -65,6 +67,7 @@ char *sCornerTrans[] = {
  */
 
 static void* FullWidthCharCreate(FcitxInstance* instance);
+static void ReloadFullWidthChar(void* arg);
 char* ProcessFullWidthChar(void* arg, const char* str);
 //static void ToggleFullWidthState(void *arg);
 //static boolean GetFullWidthState(void *arg);
@@ -77,6 +80,7 @@ static boolean FullWidthPostFilter(void* arg, FcitxKeySym sym,
 
 typedef struct _FcitxFullWidthChar {
     FcitxInstance* owner;
+    boolean RemainHalfWidth;
 } FcitxFullWidthChar;
 
 FCITX_DEFINE_PLUGIN(fcitx_fullwidth_char_enhance, module, FcitxModule) = {
@@ -84,14 +88,23 @@ FCITX_DEFINE_PLUGIN(fcitx_fullwidth_char_enhance, module, FcitxModule) = {
     NULL,
     NULL,
     NULL,
-    NULL
+    ReloadFullWidthChar
 };
 
 FCITX_EXPORT_API int ABI_VERSION = FCITX_ABI_VERSION;
 
+void ReloadFullWidthChar(void* arg)
+{
+    FcitxFullWidthChar* fwchar = (FcitxFullWidthChar*) arg;
+    fwchar->RemainHalfWidth = getCfgValueBool("sogouEnv.ini", "Advance:RemainHalfWidth", 0);
+    //FcitxLog(WARNING, "fwchar->RemainHalfWidth:%x", fwchar->RemainHalfWidth);
+}
+
 void* FullWidthCharCreate(FcitxInstance* instance)
 {
     FcitxFullWidthChar* fwchar = fcitx_utils_malloc0(sizeof(FcitxFullWidthChar));
+    ReloadFullWidthChar(fwchar);
+
     //FcitxGlobalConfig* config = FcitxInstanceGetGlobalConfig(instance);
     fwchar->owner = instance;
     FcitxStringFilterHook hk;
@@ -147,7 +160,7 @@ boolean FullWidthPostFilter(void* arg, FcitxKeySym sym,
     //fprintf(stderr, "status->visible:%d\n", status->visible);
 
     FcitxIM *im = FcitxInstanceGetCurrentIM(fwchar->owner);
-    if (im == NULL || strcmp("sogoupinyin", im->uniqueName) != 0)
+    if (im == NULL || strcmp("sogoupinyin", im->uniqueName) != 0 || fwchar->RemainHalfWidth == true)
         return false;
 
     sym = FcitxHotkeyPadToMain(sym);
@@ -170,7 +183,7 @@ char* ProcessFullWidthChar(void* arg, const char* str)
     //fprintf(stderr, "status->visible:%d\n", status->visible);
 
     FcitxIM *im = FcitxInstanceGetCurrentIM(fwchar->owner);
-    if (im == NULL || strcmp("sogoupinyin", im->uniqueName) != 0)
+    if (im == NULL || strcmp("sogoupinyin", im->uniqueName) != 0 || fwchar->RemainHalfWidth == true)
         return NULL;
 
     if (profile->bUseFullWidthChar/* && status->visible*/) {
